@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: robotics-door-lock
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: BREVO_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: SENDER_NAME
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: ADMIN_EMAIL_COLUMN_INDEX
+        value: 4
+      - key: MEMBER_DATA_LOGGING_COLUMN_NAME_INDEX
+        value: 0
+      - key: MEMBER_DATA_LOGGING_COLUMN_REGNO_INDEX
+        value: 1
+      - key: MEMBER_DATA_LOGGING_COLUMN_EMAIL_INDEX
+        value: 2
+      - key: MEMBER_DATA_LOGGING_COLUMN_PASSWORD_INDEX
+        value: 3
+      - key: MEMBER_DATA_LOGGING_COLUMN_TIMESTAMP_INDEX
+        value: 6
+      - key: IS_PRODUCTION
+        value: true
