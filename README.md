@@ -1,6 +1,7 @@
 # 🤖 Robotics Club Door Lock Management System
 
-A comprehensive web-based door lock management system for Robotics Club NIT Allahabad. This full-stack application provides secure admin authentication, member management, password generation, and real-time door access control.
+A comprehensive web-based door lock management system. This full-stack application provides secure admin authentication, member management, password generation, and real-time door access control.
+### Check FRONTEND.md for images of frontend
 
 ![System Architecture](https://img.shields.io/badge/Stack-Node.js%20%2B%20React%20%2B%20javaScript-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
