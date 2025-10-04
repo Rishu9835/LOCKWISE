@@ -76,7 +76,7 @@ async function getAdminEmails() {
         return admins;
     } catch (error) {
         console.error('Failed to load admin emails:', error);
-        return ['Admin', 'rishuraj9431@gmail.com']; // Fallback admins
+        return ['Admin', 'Admin@gmail.com']; // Fallback admins
     }
 }
 
