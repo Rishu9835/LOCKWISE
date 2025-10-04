@@ -2,7 +2,7 @@
 
 A comprehensive web-based door lock management system for Robotics Club NIT Allahabad. This full-stack application provides secure admin authentication, member management, password generation, and real-time door access control.
 
-![System Architecture](https://img.shields.io/badge/Stack-Node.js%20%2B%20React%20%2B%20TypeScript-blue)
+![System Architecture](https://img.shields.io/badge/Stack-Node.js%20%2B%20React%20%2B%20javaScript-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
 
