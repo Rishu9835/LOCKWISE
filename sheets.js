@@ -13,28 +13,24 @@ const auth = new google.auth.GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
+// Initialize the auth client
+let sheets;
+
+async function getAuthenticatedSheetsClient() {
+    if (!sheets) {
+        const client = await auth.getClient();
+        sheets = google.sheets({ version: 'v4', auth: client });
+    }
+    return sheets;
+}
+
 console.log('Google Sheets authentication initialized successfully');
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID; 
 const SHEET_NAME = 'door_log'; // Change as needed
 
-let sheets;
-
-async function initializeSheets() {
-    if (!sheets) {
-        try {
-            const client = await auth.getClient();
-            sheets = google.sheets({ version: 'v4', auth: client });
-        } catch (error) {
-            console.error('Failed to initialize Google Sheets:', error);
-            throw error;
-        }
-    }
-    return sheets;
-}
-
 async function appendEmailToSheet(name, regNo, email, password) {
-    const sheetsInstance = await initializeSheets();
+    const sheetsInstance = await getAuthenticatedSheetsClient();
     const now = new Date().toISOString();
     // Match your actual Google Sheet structure: A=Name, B=RegNo, C=Email, D=Password, E=Admin(empty), F=DoorOTP(empty), G=Timestamp
     const values = [[name || '', regNo || '', email || '', password || '', '', '', now]];
@@ -58,7 +54,7 @@ async function appendEmailToSheet(name, regNo, email, password) {
 
 
 async function getValueSheet(row, col) {
-    const sheetsInstance = await initializeSheets();
+    const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
         const response = await sheetsInstance.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
@@ -78,7 +74,7 @@ async function getValueSheet(row, col) {
 }
 
 async function changeValueSheet(row, col, newValue) {
-    const sheetsInstance = await initializeSheets();
+    const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
         await sheetsInstance.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
@@ -96,7 +92,7 @@ async function changeValueSheet(row, col, newValue) {
 }
 
 async function getAllValFromColumn(col) {
-    const sheetsInstance = await initializeSheets();
+    const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
         const response = await sheetsInstance.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
