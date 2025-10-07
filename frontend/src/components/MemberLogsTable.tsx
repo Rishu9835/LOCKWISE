@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Users, RefreshCw, Download, Search, Calendar, User, Mail, Key, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
-// Use environment variable for API URL
+// Use environment variable for API URL, fallback to localhost for development
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 interface MemberLog {

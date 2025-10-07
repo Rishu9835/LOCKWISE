@@ -33,36 +33,6 @@ app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Robotics Club Door Lock API Server', status: 'running' });
 });
-
-// Lightweight health/info endpoint (no sensitive data)
-app.get('/api/health', async (req, res) => {
-    try {
-        const hasSpreadsheetId = Boolean(process.env.SPREADSHEET_ID);
-        const hasCreds = Boolean(process.env.GOOGLE_KEY_JSON);
-        const adminCol = Number(process.env.ADMIN_COL);
-        let adminCount = null;
-        try {
-            const admins = await getAllValFromColumn(adminCol);
-            adminCount = Array.isArray(admins) ? admins.length : null;
-        } catch (e) {
-            // ignore detailed error to avoid leaking info
-            adminCount = -1; // indicates fetch error
-        }
-        res.json({
-            ok: true,
-            nodeEnv: process.env.NODE_ENV || 'development',
-            sheet: {
-                hasSpreadsheetId,
-                sheetName: 'door_log',
-                adminCol,
-                adminCount,
-            },
-            creds: { hasCreds }
-        });
-    } catch (err) {
-        res.status(500).json({ ok: false, error: 'healthcheck-failed' });
-    }
-});
 //=========================//
 // Helper: Send Email via Brevo
 //=========================//
@@ -106,17 +76,7 @@ async function getAdminEmails() {
     try {
         const parsed = Number(process.env.ADMIN_COL);
         const adminCol = Number.isFinite(parsed) ? parsed : 4; // default to column E (0-based index 4)
-        let admins = await getAllValFromColumn(adminCol);
-        // Heuristic: if configured column has very few email-like entries, try fallback to column E (index 4)
-        const countAt = (arr) => arr.filter(v => v.includes('@')).length;
-        const atConfigured = countAt(admins);
-        if (atConfigured === 0 && adminCol !== 4) {
-            const fallbackAdmins = await getAllValFromColumn(4);
-            const atFallback = countAt(fallbackAdmins);
-            if (atFallback > atConfigured) {
-                admins = fallbackAdmins;
-            }
-        }
+        const admins = await getAllValFromColumn(adminCol);
         console.log('Admin emails loaded from Google Sheets:', admins.length, 'admins found');
         return admins;
     } catch (error) {
@@ -175,18 +135,6 @@ app.post('/api/verifyAdmin', async (req, res) => {
     } catch (err) {
         console.error('Error sending OTP:', err);
         return res.status(500).send('Failed to send OTP.');
-    }
-});
-
-// Check if a given email is recognized as admin (returns boolean only)
-app.get('/api/check-admin', async (req, res) => {
-    try {
-        const email = String(req.query.email || '').trim().toLowerCase();
-        if (!email) return res.status(400).json({ error: 'email query param required' });
-        const admins = await getAdminEmails();
-        return res.json({ email, isAdmin: admins.includes(email), adminCount: admins.length });
-    } catch (e) {
-        return res.status(500).json({ error: 'failed-to-check-admin' });
     }
 });
 
@@ -277,29 +225,23 @@ app.post('/api/enter', async (req, res) => {
 // Debug endpoint to check sheet data
 app.get('/api/debug-sheet', async (req, res) => {
     try {
-        const memEmailCol = Number(process.env.MEMBER_EMAIL_COL);
-        const memRegCol = Number(process.env.MEMBER_REG_NO_COL);
-        const memPassCol = Number(process.env.MEMBER_PASSWORD_COL);
-        const adminCol = Number(process.env.ADMIN_COL);
-        const emails = await getAllValFromColumn(memEmailCol);
-        const regNos = await getAllValFromColumn(memRegCol);
-        const passwords = await getAllValFromColumn(memPassCol);
-        const admins = await getAllValFromColumn(adminCol);
+        const emails = await getAllValFromColumn(Number(process.env.MEMBER_EMAIL_COL));
+        const regNos = await getAllValFromColumn(Number(process.env.MEMBER_REG_NO_COL));
+        const passwords = await getAllValFromColumn(Number(process.env.MEMBER_PASSWORD_COL));
+        const admins = await getAllValFromColumn(Number(process.env.ADMIN_COL));
         
         res.json({
             columns: {
-                MEMBER_EMAIL_COL: memEmailCol,
-                MEMBER_REG_NO_COL: memRegCol,
-                MEMBER_PASSWORD_COL: memPassCol,
-                ADMIN_COL: adminCol
+                MEMBER_EMAIL_COL: process.env.MEMBER_EMAIL_COL,
+                MEMBER_REG_NO_COL: process.env.MEMBER_REG_NO_COL,
+                MEMBER_PASSWORD_COL: process.env.MEMBER_PASSWORD_COL,
+                ADMIN_COL: process.env.ADMIN_COL
             },
             data: {
-                counts: {
-                    emails: emails.length,
-                    regNos: regNos.length,
-                    passwords: passwords.length,
-                    admins: admins.length
-                }
+                emails,
+                regNos, 
+                passwords,
+                admins
             }
         });
     } catch (error) {

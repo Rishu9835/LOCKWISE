@@ -2,10 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import OtpTimer from '../components/OtpTimer'
 import MemberLogsTable from '../components/MemberLogsTable'
-
-// Use environment variable for API URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-
 import { 
   Users, 
   Calendar, 
@@ -23,6 +19,9 @@ import {
   DoorOpen,
   AlertCircle
 } from 'lucide-react'
+
+// Use environment variable for API URL, fallback to localhost for development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 interface MemberEntry {
   regNo: string
