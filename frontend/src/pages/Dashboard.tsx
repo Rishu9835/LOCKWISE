@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import OtpTimer from '../components/OtpTimer'
 import MemberLogsTable from '../components/MemberLogsTable'
+
+// Use environment variable for API URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
 import { 
   Users, 
   Calendar, 
@@ -117,7 +121,7 @@ const Dashboard: React.FC = () => {
     setPasswordChangeError('')
 
     try {
-      const response = await fetch('http://localhost:3000/changepassword', {
+      const response = await fetch(`${API_URL}/changepassword`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -152,7 +156,7 @@ const Dashboard: React.FC = () => {
     setPasswordChangeError('')
 
     try {
-      const response = await fetch('http://localhost:3000/changepassword', {
+      const response = await fetch(`${API_URL}/changepassword`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -187,7 +191,7 @@ const Dashboard: React.FC = () => {
     setDoorOtpSuccess('')
 
     try {
-      const response = await fetch('http://localhost:3000/admin/generateDoorOtp', {
+      const response = await fetch(`${API_URL}/admin/generateDoorOtp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -286,7 +290,7 @@ const Dashboard: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/enter', {
+      const response = await fetch(`${API_URL}/enter`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

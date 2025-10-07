@@ -1,10 +1,15 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import fetch from 'node-fetch'; // for making API calls
 import sheets from './sheets.js';
 import { generateOtp, getExpiry } from './utils/otp.js';
 import { saveOtp, verifyOtp, cleanupOtps } from './store/otpstore.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const { appendEmailToSheet, getValueSheet, changeValueSheet, getAllValFromColumn } = sheets;
 
@@ -20,15 +25,13 @@ const loggedInAdmins = new Set();
 
 app.use(cors());
 app.use(express.json());
-// app.use(express.static('public')); // Commented out since using React frontend
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Robotics Club Door Lock API Server', status: 'running' });
-});
+// Serve static files from frontend/dist
+app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
 
-// Get test
-app.get('/get', (req, res) => {
-    res.send("Hello World!");
+// API test endpoint
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'Robotics Club Door Lock API Server', status: 'running' });
 });
 //=========================//
 // Helper: Send Email via Brevo
@@ -81,7 +84,7 @@ async function getAdminEmails() {
 }
 
 // Verify admin and send OTP
-app.post('/verifyAdmin', async (req, res) => {
+app.post('/api/verifyAdmin', async (req, res) => {
     const { email, otp } = req.body; // if otp is undefined, it's step 1
     const admins = await getAdminEmails();
 
@@ -135,7 +138,7 @@ async function requireAdmin(req, res, next) {
     next();
 }
 
-app.post('/admin/logout', (req, res) => {
+app.post('/api/admin/logout', (req, res) => {
     const { email } = req.body;
     if (!email || !loggedInAdmins.has(email)) {
         return res.status(400).send("Admin not logged in");
@@ -148,12 +151,18 @@ app.post('/admin/logout', (req, res) => {
 
 
 // Log entry
-app.post('/enter', async (req, res) => {
+app.post('/api/enter', async (req, res) => {
     const { name, regNo, email } = req.body;
     
     // Validate required fields
-    if (!regNo || !email) {
-        return res.status(400).json({ error: 'Registration number and email are required' });
+    // For ESP32, only regNo is required. For frontend, both regNo and email are required
+    if (!regNo) {
+        return res.status(400).json({ error: 'Registration number is required' });
+    }
+    
+    // If request comes from frontend (has email), validate email
+    if (email && !name) {
+        return res.status(400).json({ error: 'Name is required when email is provided' });
     }
 
     try {
@@ -203,7 +212,7 @@ app.post('/enter', async (req, res) => {
 
 
 // Debug endpoint to check sheet data
-app.get('/debug-sheet', async (req, res) => {
+app.get('/api/debug-sheet', async (req, res) => {
     try {
         const emails = await getAllValFromColumn(Number(process.env.MEMBER_EMAIL_COL));
         const regNos = await getAllValFromColumn(Number(process.env.MEMBER_REG_NO_COL));
@@ -231,7 +240,7 @@ app.get('/debug-sheet', async (req, res) => {
 });
 
 // Update password fetch
-app.post('/update', requireAdmin, async (req, res) => {
+app.post('/api/update', requireAdmin, async (req, res) => {
     try {
         const currentPassword = await getAllValFromColumn(Number(process.env.MEMBER_PASSWORD_COL));
         res.status(200).send(currentPassword.join(','));
@@ -320,7 +329,7 @@ const changePassword = async () => {
 };
 
 // Admin generates OTP for door unlock
-app.post('/admin/generateDoorOtp', requireAdmin,async (req, res) => {
+app.post('/api/admin/generateDoorOtp', requireAdmin,async (req, res) => {
     try {
         // 1️⃣ Generate OTP
         const otp = generateOtp();
@@ -392,7 +401,7 @@ app.post('/admin/generateDoorOtp', requireAdmin,async (req, res) => {
 
 
 // Door verifies OTP
-app.post('/door/verifyOtp', (req, res) => {
+app.post('/api/door/verifyOtp', async (req, res) => {
   const { otp } = req.body;
   const result = verifyOtp(otp, 'DOOR');
 
@@ -400,13 +409,43 @@ app.post('/door/verifyOtp', (req, res) => {
     return res.status(400).json({ error: result.reason });
   }
 
-  res.json({ success: true, message: 'Door unlocked!' });
+  try {
+    // Find the row with this OTP in the door OTPs column
+    const doorOtpCol = Number(process.env.DOOR_OTP_COL);
+    const timestampCol = 6; // Column G for timestamp
+    const otps = await getAllValFromColumn(doorOtpCol);
+    const rowIndex = otps.indexOf(otp);
+
+    if (rowIndex !== -1) {
+      // Update timestamp for this OTP usage
+      const timestamp = new Date().toISOString();
+      await changeValueSheet(rowIndex, timestampCol, timestamp);
+      console.log(`Timestamp logged for OTP ${otp} at row ${rowIndex}`);
+    }
+
+    res.json({ success: true, message: 'Door unlocked!', timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error logging timestamp:', error);
+    // Still return success even if timestamp logging fails
+    res.json({ success: true, message: 'Door unlocked! (Timestamp logging failed)' });
+  }
 });
 
 // Manual or cron-triggered password reset
 
-app.post('/changepassword', requireAdmin, async (req, res) => {
-    const { cron_job_pass, otp, confirm } = req.body;
+app.post('/api/changepassword', requireAdmin, async (req, res) => {
+    const { cron_job_pass, otp, confirm, adminPass } = req.body;
+
+    // Handle ESP32 adminPass request
+    if (adminPass) {
+        try {
+            await changePassword();
+            return res.status(200).send("Password changed successfully");
+        } catch (error) {
+            console.error("Password change error:", error);
+            return res.status(500).send("Error changing password");
+        }
+    }
 
     // 1️⃣ Cron job triggered password reset
     if (cron_job_pass && cron_job_pass === process.env.CRON_JOB_PASSWROD) {
@@ -478,7 +517,7 @@ app.post('/changepassword', requireAdmin, async (req, res) => {
 });
 
 // Get member logs from Google Sheet
-app.post('/admin/getMemberLogs', requireAdmin, async (req, res) => {
+app.post('/api/admin/getMemberLogs', requireAdmin, async (req, res) => {
     try {
         // Fetch data from actual Google Sheet structure based on your screenshot
         // Your sheet has: RegNo (B=1), Email (C=2), Password (D=3), Admin (E=4)
@@ -506,7 +545,8 @@ app.post('/admin/getMemberLogs', requireAdmin, async (req, res) => {
             timestamps?.length || 0
         );
 
-        for (let i = 0; i < maxLength; i++) {
+        // Start from index 1 to skip the header row
+        for (let i = 1; i < maxLength; i++) {
             // Skip if no essential data in this row (need at least regNo or email)
             if (!regNos?.[i] && !emails?.[i]) continue;
 
@@ -542,6 +582,10 @@ app.post('/admin/getMemberLogs', requireAdmin, async (req, res) => {
 // every 5 minutes, purge expired/used OTPs
 setInterval(cleanupOtps, 10 * 60 * 1000);
 
+// Serve frontend for all other routes (must be last)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+});
 
 //=========================//
 app.listen(PORT, () => {

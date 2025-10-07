@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { Users, RefreshCw, Download, Search, Calendar, User, Mail, Key, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
+// Use environment variable for API URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
 interface MemberLog {
   id: number
   name: string
@@ -41,7 +44,7 @@ export const MemberLogsTable: React.FC<MemberLogsTableProps> = ({ className = ''
     setLoading(true)
     setError('')
     try {
-      const response = await fetch('http://localhost:3000/admin/getMemberLogs', {
+      const response = await fetch(`${API_URL}/admin/getMemberLogs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

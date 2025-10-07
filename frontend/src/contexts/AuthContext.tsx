@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+// Use environment variable for API URL, fallback to localhost for development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
 interface User {
   id: string
   name: string
@@ -35,7 +38,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const sendOtp = async (email: string): Promise<{ success: boolean; expiresAt?: number; validityMinutes?: number }> => {
     setLoading(true)
     try {
-      const response = await fetch('http://localhost:3000/verifyAdmin', {
+      const response = await fetch(`${API_URL}/verifyAdmin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -67,7 +70,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const verifyOtp = async (email: string, otp: string): Promise<boolean> => {
     setLoading(true)
     try {
-      const response = await fetch('http://localhost:3000/verifyAdmin', {
+      const response = await fetch(`${API_URL}/verifyAdmin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
