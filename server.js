@@ -104,7 +104,9 @@ async function sendEmailBrevo(to, subject, htmlContent) {
 // Initialize admin emails (will be loaded when needed)
 async function getAdminEmails() {
     try {
-        const admins = await getAllValFromColumn(Number(process.env.ADMIN_COL));
+        const parsed = Number(process.env.ADMIN_COL);
+        const adminCol = Number.isFinite(parsed) ? parsed : 4; // default to column E (0-based index 4)
+        const admins = await getAllValFromColumn(adminCol);
         console.log('Admin emails loaded from Google Sheets:', admins.length, 'admins found');
         return admins;
     } catch (error) {
@@ -163,6 +165,18 @@ app.post('/api/verifyAdmin', async (req, res) => {
     } catch (err) {
         console.error('Error sending OTP:', err);
         return res.status(500).send('Failed to send OTP.');
+    }
+});
+
+// Check if a given email is recognized as admin (returns boolean only)
+app.get('/api/check-admin', async (req, res) => {
+    try {
+        const email = String(req.query.email || '').trim().toLowerCase();
+        if (!email) return res.status(400).json({ error: 'email query param required' });
+        const admins = await getAdminEmails();
+        return res.json({ email, isAdmin: admins.includes(email), adminCount: admins.length });
+    } catch (e) {
+        return res.status(500).json({ error: 'failed-to-check-admin' });
     }
 });
 
@@ -253,23 +267,29 @@ app.post('/api/enter', async (req, res) => {
 // Debug endpoint to check sheet data
 app.get('/api/debug-sheet', async (req, res) => {
     try {
-        const emails = await getAllValFromColumn(Number(process.env.MEMBER_EMAIL_COL));
-        const regNos = await getAllValFromColumn(Number(process.env.MEMBER_REG_NO_COL));
-        const passwords = await getAllValFromColumn(Number(process.env.MEMBER_PASSWORD_COL));
-        const admins = await getAllValFromColumn(Number(process.env.ADMIN_COL));
+        const memEmailCol = Number(process.env.MEMBER_EMAIL_COL);
+        const memRegCol = Number(process.env.MEMBER_REG_NO_COL);
+        const memPassCol = Number(process.env.MEMBER_PASSWORD_COL);
+        const adminCol = Number(process.env.ADMIN_COL);
+        const emails = await getAllValFromColumn(memEmailCol);
+        const regNos = await getAllValFromColumn(memRegCol);
+        const passwords = await getAllValFromColumn(memPassCol);
+        const admins = await getAllValFromColumn(adminCol);
         
         res.json({
             columns: {
-                MEMBER_EMAIL_COL: process.env.MEMBER_EMAIL_COL,
-                MEMBER_REG_NO_COL: process.env.MEMBER_REG_NO_COL,
-                MEMBER_PASSWORD_COL: process.env.MEMBER_PASSWORD_COL,
-                ADMIN_COL: process.env.ADMIN_COL
+                MEMBER_EMAIL_COL: memEmailCol,
+                MEMBER_REG_NO_COL: memRegCol,
+                MEMBER_PASSWORD_COL: memPassCol,
+                ADMIN_COL: adminCol
             },
             data: {
-                emails,
-                regNos, 
-                passwords,
-                admins
+                counts: {
+                    emails: emails.length,
+                    regNos: regNos.length,
+                    passwords: passwords.length,
+                    admins: admins.length
+                }
             }
         });
     } catch (error) {
