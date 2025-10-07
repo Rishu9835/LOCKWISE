@@ -3,9 +3,15 @@ import { google } from 'googleapis';
 dotenv.config();
 
 // Decode Google Service Account JSON from base64
-const credentials = JSON.parse(
-  Buffer.from(process.env.GOOGLE_KEY_JSON, "base64").toString("utf-8")
-);
+let credentials;
+try {
+    const credentialsJson = Buffer.from(process.env.GOOGLE_KEY_JSON, "base64").toString("utf-8");
+    credentials = JSON.parse(credentialsJson);
+    console.log('Google credentials loaded successfully. Client email:', credentials.client_email);
+} catch (error) {
+    console.error('Failed to parse Google credentials:', error.message);
+    throw new Error('Invalid Google Service Account credentials');
+}
 
 // Create auth client using GoogleAuth with credentials
 const auth = new google.auth.GoogleAuth({
@@ -28,6 +34,14 @@ console.log('Google Sheets authentication initialized successfully');
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID; 
 const SHEET_NAME = 'door_log'; // Change as needed
+
+if (!SPREADSHEET_ID) {
+    console.error('CRITICAL: SPREADSHEET_ID environment variable is not set');
+    throw new Error('SPREADSHEET_ID environment variable is required');
+}
+
+console.log('Using spreadsheet ID:', SPREADSHEET_ID);
+console.log('Using sheet name:', SHEET_NAME);
 
 async function appendEmailToSheet(name, regNo, email, password) {
     const sheetsInstance = await getAuthenticatedSheetsClient();
@@ -94,25 +108,31 @@ async function changeValueSheet(row, col, newValue) {
 async function getAllValFromColumn(col) {
     const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
+        console.log(`Reading from spreadsheet ${SPREADSHEET_ID}, sheet ${SHEET_NAME}, column ${String.fromCharCode(65 + col)}`);
+        
         const response = await sheetsInstance.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: `${SHEET_NAME}!${String.fromCharCode(65 + col)}:${String.fromCharCode(65 + col)}`, // Specified column only
         });
 
         const rows = response.data.values;
+        console.log(`Column ${col} raw data:`, rows ? rows.length : 0, 'rows');
 
         if (!rows || rows.length === 0) {
-            // console.log('No emails found in column D.');
+            console.log(`No data found in column ${col}`);
             return [];
         }
+        
         // Handle missing values and normalize: trim + lowercase, filter empties
         const data = rows
             .map(row => (row && row[0] ? String(row[0]) : ''))
             .map(v => v.trim().toLowerCase())
             .filter(v => v.length > 0);
+            
+        console.log(`Column ${col} processed data:`, data.length, 'items');
         return data;
     } catch (err) {
-        // console.error('Failed to retrieve emails from Google Sheets:', err);
+        console.error(`Failed to retrieve data from column ${col}:`, err.message);
         throw err;
     }
 }
