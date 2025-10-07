@@ -33,6 +33,26 @@ app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Robotics Club Door Lock API Server', status: 'running' });
 });
+
+// Debug endpoint to check admin count and config (no sensitive data)
+app.get('/api/debug-admin', async (req, res) => {
+    try {
+        const email = req.query.email;
+        const admins = await getAdminEmails();
+        const normalizedInput = email ? String(email).trim().toLowerCase() : '';
+        
+        res.json({
+            adminCount: admins.length,
+            adminCol: process.env.ADMIN_COL,
+            inputEmail: normalizedInput,
+            isAdmin: normalizedInput ? admins.includes(normalizedInput) : false,
+            // Only show first few characters for security
+            adminSamples: admins.slice(0, 2).map(e => e.substring(0, 8) + '***')
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to check admin status', message: error.message });
+    }
+});
 //=========================//
 // Helper: Send Email via Brevo
 //=========================//
