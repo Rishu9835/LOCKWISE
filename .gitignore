@@ -18,9 +18,19 @@ dist/
 
 # Google Service Account
 etc/secrets/
-*.json
 service-account.json
 google-credentials.json
+**/google-*.json
+**/service-*.json
+
+# But allow package.json and other config files
+!package.json
+!package-lock.json
+!**/package.json
+!**/package-lock.json
+!vercel.json
+!tsconfig.json
+!**/tsconfig*.json
 
 # Logs
 *.log
