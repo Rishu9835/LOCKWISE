@@ -109,8 +109,11 @@ async function getAllValFromColumn(col) {
             // console.log('No emails found in column D.');
             return [];
         }
-        // handle missing values and flatten
-        const data = rows.map(row => row[0] ? row[0] : '');
+        // Handle missing values and normalize: trim + lowercase, filter empties
+        const data = rows
+            .map(row => (row && row[0] ? String(row[0]) : ''))
+            .map(v => v.trim().toLowerCase())
+            .filter(v => v.length > 0);
         return data;
     } catch (err) {
         // console.error('Failed to retrieve emails from Google Sheets:', err);

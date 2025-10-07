@@ -89,7 +89,14 @@ app.post('/api/verifyAdmin', async (req, res) => {
     const admins = await getAdminEmails();
 
     if (!email) return res.status(400).send('Missing required field: email');
-    if (!admins.includes(email)) return res.status(400).send('You are not an admin');
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const isAdmin = admins.includes(normalizedEmail);
+    if (!isAdmin) {
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('Admin check failed. Received:', normalizedEmail, 'Known admins count:', admins.length);
+        }
+        return res.status(400).send('You are not an admin');
+    }
 
     // Step 2: OTP is provided → verify and log in
     if (otp) {
@@ -98,8 +105,8 @@ app.post('/api/verifyAdmin', async (req, res) => {
             return res.status(400).send(`OTP invalid: ${result.reason}`);
         }
 
-        loggedInAdmins.add(email); // now admin is logged in
-        console.log(`Admin ${email} logged in successfully.`);
+        loggedInAdmins.add(normalizedEmail); // now admin is logged in
+        console.log(`Admin ${normalizedEmail} logged in successfully.`);
         return res.status(200).send('Admin verified and logged in.');
     }
 
@@ -116,8 +123,8 @@ app.post('/api/verifyAdmin', async (req, res) => {
     `;
 
     try {
-        await sendEmailBrevo(email, subject, htmlContent);
-        console.log(`OTP sent to admin email: ${email}`);
+        await sendEmailBrevo(normalizedEmail, subject, htmlContent);
+        console.log(`OTP sent to admin email: ${normalizedEmail}`);
         return res.status(200).json({ 
             message: 'OTP sent to admin email.',
             expiresAt: expiresAt,
@@ -132,7 +139,8 @@ app.post('/api/verifyAdmin', async (req, res) => {
 
 async function requireAdmin(req, res, next) {
     const { email } = req.body;
-    if (!email || !loggedInAdmins.has(email)) {
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
+    if (!normalizedEmail || !loggedInAdmins.has(normalizedEmail)) {
         return res.status(401).send("Unauthorized: Admin not verified");
     }
     next();
