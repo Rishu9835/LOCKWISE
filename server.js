@@ -107,54 +107,80 @@ async function getAdminEmails() {
 
 // Verify admin and send OTP
 app.post('/api/verifyAdmin', async (req, res) => {
-    const { email, otp } = req.body; // if otp is undefined, it's step 1
-    const admins = await getAdminEmails();
-
-    if (!email) return res.status(400).send('Missing required field: email');
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const isAdmin = admins.includes(normalizedEmail);
-    if (!isAdmin) {
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('Admin check failed. Received:', normalizedEmail, 'Known admins count:', admins.length);
-        }
-        return res.status(400).send('You are not an admin');
-    }
-
-    // Step 2: OTP is provided → verify and log in
-    if (otp) {
-        const result = verifyOtp(otp, 'ADMIN');
-        if (!result.valid) {
-            return res.status(400).send(`OTP invalid: ${result.reason}`);
-        }
-
-        loggedInAdmins.add(normalizedEmail); // now admin is logged in
-        console.log(`Admin ${normalizedEmail} logged in successfully.`);
-        return res.status(200).send('Admin verified and logged in.');
-    }
-
-    // Step 1: No OTP yet → generate OTP and send email
-    const generatedOtp = generateOtp();
-    const expiresAt = getExpiry(5); // 5 minutes
-    saveOtp(generatedOtp, 'ADMIN', expiresAt);
-
-    const subject = "Admin Verification OTP";
-    const htmlContent = `
-        <p>Hello Admin,</p>
-        <p>Your OTP for login is: <b>${generatedOtp}</b></p>
-        <p>This OTP is valid for 5 minutes.</p>
-    `;
-
+    console.log('=== verifyAdmin called ===');
+    console.log('Request body:', req.body);
+    
     try {
-        await sendEmailBrevo(normalizedEmail, subject, htmlContent);
-        console.log(`OTP sent to admin email: ${normalizedEmail}`);
-        return res.status(200).json({ 
-            message: 'OTP sent to admin email.',
-            expiresAt: expiresAt,
-            validityMinutes: 5
-        });
+        const { email, otp } = req.body; // if otp is undefined, it's step 1
+        
+        if (!email) {
+            console.log('ERROR: Missing email field');
+            return res.status(400).send('Missing required field: email');
+        }
+        
+        console.log('Loading admin emails from Google Sheets...');
+        const admins = await getAdminEmails();
+        console.log('Loaded admins:', admins.length);
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        console.log('Normalized email:', normalizedEmail);
+        
+        const isAdmin = admins.includes(normalizedEmail);
+        console.log('Is admin?', isAdmin);
+        
+        if (!isAdmin) {
+            console.log('Admin check failed. Received:', normalizedEmail, 'Known admins count:', admins.length);
+            return res.status(400).send('You are not an admin');
+        }
+    } catch (error) {
+        console.error('Error in verifyAdmin:', error);
+        return res.status(500).send('Internal server error');
+        
+        // Step 2: OTP is provided → verify and log in
+        if (otp) {
+            console.log('Step 2: Verifying OTP:', otp);
+            const result = verifyOtp(otp, 'ADMIN');
+            if (!result.valid) {
+                console.log('OTP verification failed:', result.reason);
+                return res.status(400).send(`OTP invalid: ${result.reason}`);
+            }
+
+            loggedInAdmins.add(normalizedEmail); // now admin is logged in
+            console.log(`Admin ${normalizedEmail} logged in successfully.`);
+            return res.status(200).send('Admin verified and logged in.');
+        }
+
+        // Step 1: No OTP yet → generate OTP and send email
+        console.log('Step 1: Generating OTP for', normalizedEmail);
+        const generatedOtp = generateOtp();
+        const expiresAt = getExpiry(5); // 5 minutes
+        saveOtp(generatedOtp, 'ADMIN', expiresAt);
+        console.log('OTP generated:', generatedOtp, 'expires at:', new Date(expiresAt));
+
+        const subject = "Admin Verification OTP";
+        const htmlContent = `
+            <p>Hello Admin,</p>
+            <p>Your OTP for login is: <b>${generatedOtp}</b></p>
+            <p>This OTP is valid for 5 minutes.</p>
+        `;
+
+        try {
+            console.log('Attempting to send email via Brevo...');
+            await sendEmailBrevo(normalizedEmail, subject, htmlContent);
+            console.log(`OTP sent successfully to admin email: ${normalizedEmail}`);
+            return res.status(200).json({ 
+                message: 'OTP sent to admin email.',
+                expiresAt: expiresAt,
+                validityMinutes: 5
+            });
+        } catch (emailError) {
+            console.error('Error sending OTP:', emailError);
+            return res.status(500).send('Failed to send OTP.');
+        }
+        
     } catch (err) {
-        console.error('Error sending OTP:', err);
-        return res.status(500).send('Failed to send OTP.');
+        console.error('Overall error in verifyAdmin:', err);
+        return res.status(500).send('Internal server error.');
     }
 });
 
