@@ -106,7 +106,17 @@ async function getAdminEmails() {
     try {
         const parsed = Number(process.env.ADMIN_COL);
         const adminCol = Number.isFinite(parsed) ? parsed : 4; // default to column E (0-based index 4)
-        const admins = await getAllValFromColumn(adminCol);
+        let admins = await getAllValFromColumn(adminCol);
+        // Heuristic: if configured column has very few email-like entries, try fallback to column E (index 4)
+        const countAt = (arr) => arr.filter(v => v.includes('@')).length;
+        const atConfigured = countAt(admins);
+        if (atConfigured === 0 && adminCol !== 4) {
+            const fallbackAdmins = await getAllValFromColumn(4);
+            const atFallback = countAt(fallbackAdmins);
+            if (atFallback > atConfigured) {
+                admins = fallbackAdmins;
+            }
+        }
         console.log('Admin emails loaded from Google Sheets:', admins.length, 'admins found');
         return admins;
     } catch (error) {
