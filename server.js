@@ -33,6 +33,36 @@ app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
 app.get('/api/test', (req, res) => {
     res.json({ message: 'Robotics Club Door Lock API Server', status: 'running' });
 });
+
+// Lightweight health/info endpoint (no sensitive data)
+app.get('/api/health', async (req, res) => {
+    try {
+        const hasSpreadsheetId = Boolean(process.env.SPREADSHEET_ID);
+        const hasCreds = Boolean(process.env.GOOGLE_KEY_JSON);
+        const adminCol = Number(process.env.ADMIN_COL);
+        let adminCount = null;
+        try {
+            const admins = await getAllValFromColumn(adminCol);
+            adminCount = Array.isArray(admins) ? admins.length : null;
+        } catch (e) {
+            // ignore detailed error to avoid leaking info
+            adminCount = -1; // indicates fetch error
+        }
+        res.json({
+            ok: true,
+            nodeEnv: process.env.NODE_ENV || 'development',
+            sheet: {
+                hasSpreadsheetId,
+                sheetName: 'door_log',
+                adminCol,
+                adminCount,
+            },
+            creds: { hasCreds }
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: 'healthcheck-failed' });
+    }
+});
 //=========================//
 // Helper: Send Email via Brevo
 //=========================//
@@ -148,12 +178,13 @@ async function requireAdmin(req, res, next) {
 
 app.post('/api/admin/logout', (req, res) => {
     const { email } = req.body;
-    if (!email || !loggedInAdmins.has(email)) {
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
+    if (!normalizedEmail || !loggedInAdmins.has(normalizedEmail)) {
         return res.status(400).send("Admin not logged in");
     }
 
-    loggedInAdmins.delete(email);
-    console.log(`Admin ${email} logged out`);
+    loggedInAdmins.delete(normalizedEmail);
+    console.log(`Admin ${normalizedEmail} logged out`);
     res.status(200).send("Admin logged out successfully");
 });
 
