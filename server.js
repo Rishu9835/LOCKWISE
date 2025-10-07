@@ -34,22 +34,69 @@ app.get('/api/test', (req, res) => {
     res.json({ message: 'Robotics Club Door Lock API Server', status: 'running' });
 });
 
+// Test Google Sheets connection
+app.get('/api/test-sheets', async (req, res) => {
+    try {
+        console.log('Testing Google Sheets connection...');
+        console.log('SPREADSHEET_ID:', process.env.SPREADSHEET_ID ? 'SET' : 'NOT SET');
+        console.log('GOOGLE_KEY_JSON:', process.env.GOOGLE_KEY_JSON ? 'SET (' + process.env.GOOGLE_KEY_JSON.length + ' chars)' : 'NOT SET');
+        
+        // Try to read from column A (names) first
+        const names = await getAllValFromColumn(0);
+        console.log('Names from column A:', names);
+        
+        // Then try admin column
+        const adminCol = Number(process.env.ADMIN_COL) || 4;
+        const admins = await getAllValFromColumn(adminCol);
+        console.log('Admin emails from column', adminCol, ':', admins);
+        
+        res.json({
+            success: true,
+            sheetsConnection: 'OK',
+            namesCount: names.length,
+            adminCount: admins.length,
+            namesSample: names.slice(0, 2),
+            adminsSample: admins.slice(0, 2).map(e => e.substring(0, 8) + '***')
+        });
+    } catch (error) {
+        console.error('Sheets test error:', error);
+        res.status(500).json({ error: 'Sheets connection failed', message: error.message });
+    }
+});
+
 // Debug endpoint to check admin count and config (no sensitive data)
 app.get('/api/debug-admin', async (req, res) => {
     try {
         const email = req.query.email;
+        console.log('Debug admin called with email:', email);
+        
+        const parsed = Number(process.env.ADMIN_COL);
+        const adminCol = Number.isFinite(parsed) ? parsed : 4;
+        console.log('Using admin column:', adminCol);
+        
         const admins = await getAdminEmails();
+        console.log('Raw admin emails loaded:', admins);
+        
         const normalizedInput = email ? String(email).trim().toLowerCase() : '';
+        console.log('Normalized input email:', normalizedInput);
+        
+        const isAdmin = normalizedInput ? admins.includes(normalizedInput) : false;
+        console.log('Is admin check result:', isAdmin);
         
         res.json({
+            success: true,
             adminCount: admins.length,
-            adminCol: process.env.ADMIN_COL,
+            adminCol: adminCol,
+            adminColEnv: process.env.ADMIN_COL,
             inputEmail: normalizedInput,
-            isAdmin: normalizedInput ? admins.includes(normalizedInput) : false,
-            // Only show first few characters for security
-            adminSamples: admins.slice(0, 2).map(e => e.substring(0, 8) + '***')
+            isAdmin: isAdmin,
+            // Show more detail for debugging
+            adminSamples: admins.slice(0, 3).map(e => e.substring(0, 10) + '***'),
+            spreadsheetId: process.env.SPREADSHEET_ID ? 'SET' : 'NOT SET',
+            hasGoogleCreds: process.env.GOOGLE_KEY_JSON ? 'SET' : 'NOT SET'
         });
     } catch (error) {
+        console.error('Debug admin error:', error);
         res.status(500).json({ error: 'Failed to check admin status', message: error.message });
     }
 });
