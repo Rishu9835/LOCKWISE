@@ -132,9 +132,6 @@ app.post('/api/verifyAdmin', async (req, res) => {
             console.log('Admin check failed. Received:', normalizedEmail, 'Known admins count:', admins.length);
             return res.status(400).send('You are not an admin');
         }
-    } catch (error) {
-        console.error('Error in verifyAdmin:', error);
-        return res.status(500).send('Internal server error');
         
         // Step 2: OTP is provided → verify and log in
         if (otp) {
@@ -164,22 +161,17 @@ app.post('/api/verifyAdmin', async (req, res) => {
             <p>This OTP is valid for 5 minutes.</p>
         `;
 
-        try {
-            console.log('Attempting to send email via Brevo...');
-            await sendEmailBrevo(normalizedEmail, subject, htmlContent);
-            console.log(`OTP sent successfully to admin email: ${normalizedEmail}`);
-            return res.status(200).json({ 
-                message: 'OTP sent to admin email.',
-                expiresAt: expiresAt,
-                validityMinutes: 5
-            });
-        } catch (emailError) {
-            console.error('Error sending OTP:', emailError);
-            return res.status(500).send('Failed to send OTP.');
-        }
+        console.log('Attempting to send email via Brevo...');
+        await sendEmailBrevo(normalizedEmail, subject, htmlContent);
+        console.log(`OTP sent successfully to admin email: ${normalizedEmail}`);
+        return res.status(200).json({ 
+            message: 'OTP sent to admin email.',
+            expiresAt: expiresAt,
+            validityMinutes: 5
+        });
         
     } catch (err) {
-        console.error('Overall error in verifyAdmin:', err);
+        console.error('Error in verifyAdmin:', err);
         return res.status(500).send('Internal server error.');
     }
 });
