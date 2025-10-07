@@ -1,27 +1,19 @@
 import dotenv from 'dotenv';
-import { Console } from 'console';
 import { google } from 'googleapis';
-import path from 'path';
-import fs from 'fs';
 dotenv.config();
 
-const isRender = process.env.RENDER === 'true';
-// const keyPath = isRender
-//   ? '/etc/secrets/robotics-club-door-lock-592445d6ec57.json'
-//   : path.join('etc', 'secrets', 'robotics-club-door-lock-592445d6ec57.json');
+// Decode Google Service Account JSON from base64
+const credentials = JSON.parse(
+  Buffer.from(process.env.GOOGLE_KEY_JSON, "base64").toString("utf-8")
+);
 
-const keyPath = isRender
-  ? '/etc/secrets/robotics-club-door-lock-592445d6ec57.json' // Render's expected path
-  : path.join('/tmp', 'robotics-club-door-lock-592445d6ec57.json'); // ✅ Writable on Vercel
-
-if (!fs.existsSync(keyPath)) {
-  const keyJson = Buffer.from(process.env.GOOGLE_KEY_JSON, "base64").toString("utf-8");
-  fs.writeFileSync(keyPath, keyJson);
-}
+// Create auth client using GoogleAuth with credentials
 const auth = new google.auth.GoogleAuth({
-    keyFile: keyPath,
+    credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
+
+console.log('Google Sheets authentication initialized successfully');
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID; 
 const SHEET_NAME = 'door_log'; // Change as needed
