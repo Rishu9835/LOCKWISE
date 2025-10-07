@@ -75,12 +75,11 @@ async function sendEmailBrevo(to, subject, htmlContent) {
 async function getAdminEmails() {
     try {
         const admins = await getAllValFromColumn(Number(process.env.ADMIN_COL));
-        console.log('Admin emails loaded from Google Sheets');
+        console.log('Admin emails loaded from Google Sheets:', admins.length, 'admins found');
         return admins;
     } catch (error) {
-        console.error('Failed to load admin emails from Google Sheets, using fallback:', error.message);
-        // Fallback admin - ensure your email is here
-        return ['rishuraj9431@gmail.com'];
+        console.error('CRITICAL: Failed to load admin emails from Google Sheets:', error.message);
+        throw new Error('Cannot load admin emails from Google Sheets. Check environment variables.');
     }
 }
 
