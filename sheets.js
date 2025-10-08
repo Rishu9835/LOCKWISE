@@ -141,25 +141,52 @@ async function getAllValFromColumn(col) {
     }
 }
 
+// async function appendUser(regNo) {
+//     const now = new Date().toISOString();
+//     const values = [[regNo, now]];
+
+//     try {
+//         await sheetsInstance.spreadsheets.values.append({
+//             spreadsheetId: SPREADSHEET_ID,
+//             range: `${SHEET_NAME}!I:J`,
+//             valueInputOption: 'USER_ENTERED',
+//             insertDataOption: 'INSERT_ROWS',
+//             resource: {
+//                 majorDimension: 'ROWS',
+//                 values,
+//             },
+//         });
+//         // console.log('Email logged to Google Sheets.');
+//     } catch (err) {
+//         console.error('Failed to log to Google Sheets:', err);
+//         throw err;
+//     }
+// }
 async function appendUser(regNo) {
     const now = new Date().toISOString();
-    const values = [[regNo, now]];
 
-    try {
-        const response = await sheetsInstance.spreadsheets.values.append({
-            spreadsheetId: SPREADSHEET_ID,
-            range: `${SHEET_NAME}!I:J`,
-            valueInputOption: 'USER_ENTERED',
-            resource: {
-                values,
-            },
-        });
-        // console.log('Email logged to Google Sheets.');
-    } catch (err) {
-        console.error('Failed to log to Google Sheets:', err);
-        throw err;
-    }
+    // STEP 1: Get current data length in I:J to find the next empty row
+    const getRes = await sheetsInstance.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!I:J`,
+    });
+
+    const numRows = getRes.data.values ? getRes.data.values.length : 0;
+    const nextRow = numRows + 1; // +1 because row index starts at 1 in Sheets
+
+    // STEP 2: Update that specific row instead of appending to the "table range"
+    await sheetsInstance.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!I${nextRow}:J${nextRow}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+            values: [[regNo, now]],
+        },
+    });
+
+    console.log(`Inserted at row ${nextRow} in columns I:J`);
 }
+
 
 export default {
   appendEmailToSheet,
