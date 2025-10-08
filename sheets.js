@@ -22,6 +22,7 @@ const auth = new google.auth.GoogleAuth({
 // Initialize the auth client
 let sheets;
 
+
 async function getAuthenticatedSheetsClient() {
     if (!sheets) {
         const client = await auth.getClient();
@@ -43,8 +44,11 @@ if (!SPREADSHEET_ID) {
 console.log('Using spreadsheet ID:', SPREADSHEET_ID);
 console.log('Using sheet name:', SHEET_NAME);
 
+const sheetsInstance = await getAuthenticatedSheetsClient();
+
+
 async function appendEmailToSheet(name, regNo, email, password) {
-    const sheetsInstance = await getAuthenticatedSheetsClient();
+    // const sheetsInstance = await getAuthenticatedSheetsClient();
     const now = new Date().toISOString();
     // Match your actual Google Sheet structure: A=Name, B=RegNo, C=Email, D=Password, E=Admin(empty), F=DoorOTP(empty), G=Timestamp
     const values = [[name || '', regNo || '', email || '', password || '', '', '', now]];
@@ -68,7 +72,7 @@ async function appendEmailToSheet(name, regNo, email, password) {
 
 
 async function getValueSheet(row, col) {
-    const sheetsInstance = await getAuthenticatedSheetsClient();
+    // const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
         const response = await sheetsInstance.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
@@ -88,7 +92,7 @@ async function getValueSheet(row, col) {
 }
 
 async function changeValueSheet(row, col, newValue) {
-    const sheetsInstance = await getAuthenticatedSheetsClient();
+    // const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
         await sheetsInstance.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
@@ -106,7 +110,7 @@ async function changeValueSheet(row, col, newValue) {
 }
 
 async function getAllValFromColumn(col) {
-    const sheetsInstance = await getAuthenticatedSheetsClient();
+    // const sheetsInstance = await getAuthenticatedSheetsClient();
     try {
         console.log(`Reading from spreadsheet ${SPREADSHEET_ID}, sheet ${SHEET_NAME}, column ${String.fromCharCode(65 + col)}`);
         
@@ -137,10 +141,31 @@ async function getAllValFromColumn(col) {
     }
 }
 
+async function appendUser(regNo) {
+    const now = new Date().toISOString();
+    const values = [[regNo, now]];
+
+    try {
+        const response = await sheetsInstance.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_NAME}!I:J`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+                values,
+            },
+        });
+        // console.log('Email logged to Google Sheets.');
+    } catch (err) {
+        console.error('Failed to log to Google Sheets:', err);
+        throw err;
+    }
+}
+
 export default {
   appendEmailToSheet,
   getValueSheet,
   changeValueSheet,
-  getAllValFromColumn
+  getAllValFromColumn,
+  appendUser
 };
 

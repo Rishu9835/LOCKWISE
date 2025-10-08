@@ -11,12 +11,13 @@ import { saveOtp, verifyOtp, cleanupOtps } from './store/otpstore.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { appendEmailToSheet, getValueSheet, changeValueSheet, getAllValFromColumn } = sheets;
+const { appendEmailToSheet, getValueSheet, changeValueSheet, getAllValFromColumn ,appendUser} = sheets;
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+let currentAdminPass= 696221;
 
 let currAdminPass = (Math.floor(Math.random() * 1000000)).toString().padStart(6, '0');
 // store logged-in admins
@@ -387,7 +388,7 @@ app.post('/api/update', async (req, res) => {
         console.log('Fetching ESP admin password from column', espAdminCol, '(env: ESP_ADMIN_COL)');
         
         const espAdminPasswords = await getAllValFromColumn(espAdminCol);
-        console.log('ESP admin passwords retrieved:', espAdminPasswords.length, 'entries');
+        console.log('ESP admin passwords retrieved:', espAdminPasswords[1], 'entries');
         
         // Get the hardcoded ESP password from the sheet (skip header row, use first data row)
         const validEspPassword = espAdminPasswords.length > 1 ? espAdminPasswords[1] : espAdminPasswords[0];
@@ -748,6 +749,65 @@ app.post('/api/admin/getMemberLogs', requireAdmin, async (req, res) => {
             success: false,
             error: 'Failed to fetch member logs'
         });
+    }
+});
+app.post('/api/enterESP', async (req, res) => {
+    const { regNo } = req.body;
+    if (!regNo) {
+        return res.status(400).json({ error: 'Registration number is required' });
+    }
+    try {
+        await appendUser(regNo);
+        res.status(200).send("User Entered")
+    }
+    catch{
+        console.log("error")
+        res.status(500).send("Internal Server Error")
+    }
+}
+);
+        
+
+
+app.post('/api/sendVerificationEmail', async (req, res) => {
+    const { email } = req.body;
+    const admins= await getAdminEmails();
+    if (!email || !email.includes('@')) {
+        return res.status(400).send('Invalid email address');
+    }
+    if(!email || !admins.includes(email.trim().toLowerCase())){
+        return res.status(400).send('You are not an admin');
+    }
+    try {
+        const otp = generateOtp();
+        currentAdminPass=otp;
+        saveOtp(otp, 'ADMIN');
+        const subject = "Admin Verification OTP";
+        const htmlContent = `
+            <p>Hello Admin,</p>
+            <p>Your OTP for change password <b>${otp}</b></p>
+            
+        `;
+        await sendEmailBrevo(email, subject, htmlContent);
+        return res.status(200).json({ message: 'OTP sent to admin email.' });
+    }
+    catch (error) {
+        console.error('Error sending verification email:', error);
+        return res.status(500).send('Failed to send verification email');
+    }
+});
+app.post('/api/changepassESP', async (req, res) => {
+    const { otp } = req.body;
+    if (!otp || otp !== currentAdminPass) {
+        return res.status(400).send('Invalid OTP');
+    }
+    try {
+        await changePassword();
+        currentAdminPass = (Math.floor(Math.random() * 1000000)).toString().padStart(6, '0');
+        return res.status(200).send("Password changed successfully");
+    } catch (error) {
+        console.error("Password change error:", error);
+        return res.status(500).send("Error changing password");
     }
 });
 
