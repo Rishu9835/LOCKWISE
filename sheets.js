@@ -126,7 +126,7 @@ async function getAllValFromColumn(col) {
         // Handle missing values and normalize: trim + lowercase, filter empties
         const data = rows
             .map(row => (row && row[0] ? String(row[0]) : ''))
-            .map(v => v.trim().toLowerCase())
+            .map(v => v.trim())
             .filter(v => v.length > 0);
             
         console.log(`Column ${col} processed data:`, data.length, 'items');
