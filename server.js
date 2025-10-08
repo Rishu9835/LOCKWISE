@@ -114,13 +114,13 @@ app.get('/api/debug-admin', async (req, res) => {
     }
 });
 
-// Debug endpoint for ESP admin password (for testing only) - Column H hardcoded
+// Debug endpoint for ESP admin password (for testing only)
 app.get('/api/debug-esp-admin', async (req, res) => {
     try {
         const testPassword = req.query.password;
         
-        const espAdminCol = 6; // Hardcoded to column H (index 6)
-        console.log('ESP admin column (hardcoded):', espAdminCol, '(Column H)');
+        const espAdminCol = Number(process.env.ESP_ADMIN_COL) || 7; // Default to column H (index 7)
+        console.log('ESP admin column (env ESP_ADMIN_COL):', espAdminCol);
         
         const espAdminPasswords = await getAllValFromColumn(espAdminCol);
         const validEspPassword = espAdminPasswords.length > 1 ? espAdminPasswords[1] : espAdminPasswords[0];
@@ -128,7 +128,7 @@ app.get('/api/debug-esp-admin', async (req, res) => {
         res.json({
             success: true,
             espAdminCol: espAdminCol,
-            columnName: 'Column H (hardcoded)',
+            columnName: `Column ${String.fromCharCode(65 + espAdminCol)} (index ${espAdminCol})`,
             passwordsFound: espAdminPasswords.length,
             validPassword: validEspPassword ? 'SET (' + validEspPassword.length + ' chars)' : 'NOT SET',
             testMatch: testPassword && validEspPassword ? (testPassword === validEspPassword) : null,
@@ -375,16 +375,16 @@ app.get('/api/debug-sheet', async (req, res) => {
     }
 });
 
-// Update password fetch - ESP32 endpoint with hardcoded admin password from column H (index 6)
+// Update password fetch - ESP32 endpoint with ESP admin password from environment variable
 app.post('/api/update', async (req, res) => {
     const { adminPass } = req.body;
     
     try {
         console.log('ESP update request received');
         
-        // Get ESP admin password from Google Sheets column H (index 6)
-        const espAdminCol = 6; // Column H (0-based index 6)
-        console.log('Fetching ESP admin password from column H (index 6)');
+        // Get ESP admin password column from environment variable
+        const espAdminCol = Number(process.env.ESP_ADMIN_COL) || 7; // Default to column H (index 7)
+        console.log('Fetching ESP admin password from column', espAdminCol, '(env: ESP_ADMIN_COL)');
         
         const espAdminPasswords = await getAllValFromColumn(espAdminCol);
         console.log('ESP admin passwords retrieved:', espAdminPasswords.length, 'entries');
