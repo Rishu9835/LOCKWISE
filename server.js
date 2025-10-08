@@ -773,10 +773,10 @@ app.post('/api/sendVerificationEmail', async (req, res) => {
     const { email } = req.body;
     const admins= await getAdminEmails();
     if (!email || !email.includes('@')) {
-        return res.status(400).send('Invalid email address');
+        return res.status(200).send('Invalid email address');
     }
     if(!email || !admins.includes(email.trim().toLowerCase())){
-        return res.status(400).send('You are not an admin');
+        return res.status(200).send('You are not an admin');
     }
     try {
         const otp = generateOtp();
