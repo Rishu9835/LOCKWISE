@@ -41,26 +41,39 @@ app.get('/api/test-sheets', async (req, res) => {
         console.log('SPREADSHEET_ID:', process.env.SPREADSHEET_ID ? 'SET' : 'NOT SET');
         console.log('GOOGLE_KEY_JSON:', process.env.GOOGLE_KEY_JSON ? 'SET (' + process.env.GOOGLE_KEY_JSON.length + ' chars)' : 'NOT SET');
         
-        // Try to read from column A (names) first
-        const names = await getAllValFromColumn(0);
-        console.log('Names from column A:', names);
-        
-        // Then try admin column
-        const adminCol = Number(process.env.ADMIN_COL) || 4;
-        const admins = await getAllValFromColumn(adminCol);
-        console.log('Admin emails from column', adminCol, ':', admins);
+        // Test each column to see what we can read
+        const results = {};
+        for (let col = 0; col <= 7; col++) {
+            try {
+                const values = await getAllValFromColumn(col);
+                results[`column_${col}`] = {
+                    count: values.length,
+                    sample: values.slice(0, 3).map(v => 
+                        (col === 4 || col === 6) ? (v.substring(0, 8) + '***') : v // mask admin emails and ESP password
+                    )
+                };
+                console.log(`Column ${col}:`, values.length, 'items');
+            } catch (err) {
+                results[`column_${col}`] = { error: err.message };
+                console.log(`Column ${col} error:`, err.message);
+            }
+        }
         
         res.json({
             success: true,
             sheetsConnection: 'OK',
-            namesCount: names.length,
-            adminCount: admins.length,
-            namesSample: names.slice(0, 2),
-            adminsSample: admins.slice(0, 2).map(e => e.substring(0, 8) + '***')
+            spreadsheetId: process.env.SPREADSHEET_ID,
+            adminColEnv: process.env.ADMIN_COL,
+            espAdminColEnv: process.env.ESP_ADMIN_COL,
+            columns: results
         });
     } catch (error) {
         console.error('Sheets test error:', error);
-        res.status(500).json({ error: 'Sheets connection failed', message: error.message });
+        res.status(500).json({ 
+            error: 'Sheets connection failed', 
+            message: error.message,
+            stack: error.stack 
+        });
     }
 });
 
@@ -98,6 +111,33 @@ app.get('/api/debug-admin', async (req, res) => {
     } catch (error) {
         console.error('Debug admin error:', error);
         res.status(500).json({ error: 'Failed to check admin status', message: error.message });
+    }
+});
+
+// Debug endpoint for ESP admin password (for testing only) - Column H hardcoded
+app.get('/api/debug-esp-admin', async (req, res) => {
+    try {
+        const testPassword = req.query.password;
+        
+        const espAdminCol = 6; // Hardcoded to column H (index 6)
+        console.log('ESP admin column (hardcoded):', espAdminCol, '(Column H)');
+        
+        const espAdminPasswords = await getAllValFromColumn(espAdminCol);
+        const validEspPassword = espAdminPasswords.length > 1 ? espAdminPasswords[1] : espAdminPasswords[0];
+        
+        res.json({
+            success: true,
+            espAdminCol: espAdminCol,
+            columnName: 'Column H (hardcoded)',
+            passwordsFound: espAdminPasswords.length,
+            validPassword: validEspPassword ? 'SET (' + validEspPassword.length + ' chars)' : 'NOT SET',
+            testMatch: testPassword && validEspPassword ? (testPassword === validEspPassword) : null,
+            // Don't show actual password for security
+            passwordSample: validEspPassword ? validEspPassword.substring(0, 3) + '***' : null
+        });
+    } catch (error) {
+        console.error('Debug ESP admin error:', error);
+        res.status(500).json({ error: 'Failed to check ESP admin status', message: error.message });
     }
 });
 //=========================//
@@ -335,14 +375,49 @@ app.get('/api/debug-sheet', async (req, res) => {
     }
 });
 
-// Update password fetch
-app.post('/api/update', requireAdmin, async (req, res) => {
+// Update password fetch - ESP32 endpoint with hardcoded admin password from column H (index 6)
+app.post('/api/update', async (req, res) => {
+    const { adminPass } = req.body;
+    
     try {
-        const currentPassword = await getAllValFromColumn(Number(process.env.MEMBER_PASSWORD_COL));
-        res.status(200).send(currentPassword.join(','));
+        console.log('ESP update request received');
+        
+        // Get ESP admin password from Google Sheets column H (index 6)
+        const espAdminCol = 6; // Column H (0-based index 6)
+        console.log('Fetching ESP admin password from column H (index 6)');
+        
+        const espAdminPasswords = await getAllValFromColumn(espAdminCol);
+        console.log('ESP admin passwords retrieved:', espAdminPasswords.length, 'entries');
+        
+        // Get the hardcoded ESP password from the sheet (skip header row, use first data row)
+        const validEspPassword = espAdminPasswords.length > 1 ? espAdminPasswords[1] : espAdminPasswords[0];
+        console.log('Valid ESP password from sheets:', validEspPassword ? 'SET' : 'NOT SET');
+        
+        // Verify ESP's admin password
+        if (!validEspPassword || !adminPass || adminPass !== validEspPassword) {
+            console.log('ESP admin password verification failed');
+            console.log('Provided:', adminPass ? 'SET' : 'NOT SET');
+            console.log('Expected:', validEspPassword ? 'SET' : 'NOT SET');
+            return res.status(401).send('Invalid ESP admin password');
+        }
+
+        console.log('ESP admin password verified successfully');
+        
+        // If password is valid, fetch member passwords from column D
+        const memberPasswordCol = Number(process.env.MEMBER_PASSWORD_COL) || 3; // Default to column D (index 3)
+        const currentPasswords = await getAllValFromColumn(memberPasswordCol);
+        console.log('Member passwords retrieved:', currentPasswords.length, 'entries');
+        
+        // Filter out empty passwords and join with commas
+        const validPasswords = currentPasswords.filter(pwd => pwd && pwd.length > 0);
+        const response = validPasswords.join(',');
+        
+        console.log('Sending', validPasswords.length, 'valid passwords to ESP32');
+        res.status(200).send(response);
+        
     } catch (error) {
-        console.error('Error fetching current password:', error);
-        res.status(500).send('Error fetching current password.');
+        console.error('Error in /api/update endpoint:', error);
+        res.status(500).send('Server error while processing request.');
     }
 });
 
