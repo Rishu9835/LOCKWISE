@@ -507,13 +507,14 @@ app.post('/api/admin/generateDoorOtp', requireAdmin,async (req, res) => {
         const expiresAt = getExpiry(15); // 15 minutes
         saveOtp(otp, 'DOOR', expiresAt);
 
+
         // 2️⃣ Log OTP in Google Sheet (new column for door OTPs)
         // Assuming you have a helper like changeValueSheet(row, col, value)
         // We'll append to the first empty row in a specific column
         const doorOtpCol = Number(process.env.DOOR_OTP_COL); // add in .env
-        const nextRow = await getAllValFromColumn(doorOtpCol).then(vals => vals.length);
-        await changeValueSheet(nextRow, doorOtpCol, otp);
-        console.log(`Door OTP logged in sheet at row ${nextRow}, column ${doorOtpCol}`);
+        const targetRow = 1;
+        await changeValueSheet(targetRow, doorOtpCol, otp);
+        console.log(`Door OTP logged in sheet at row ${targetRow}, column ${doorOtpCol}`);
 
         // 3️⃣ Get admin emails
         const admins = await getAdminEmails();
