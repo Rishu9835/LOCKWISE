@@ -789,7 +789,7 @@ app.post('/api/sendVerificationEmail', async (req, res) => {
             
         `;
         await sendEmailBrevo(email, subject, htmlContent);
-        return res.status(200).json({ message: 'OTP sent to admin email.' });
+        return res.status(200).send(otp);
     }
     catch (error) {
         console.error('Error sending verification email:', error);
