@@ -379,43 +379,41 @@ app.get('/api/debug-sheet', async (req, res) => {
 // Update password fetch - ESP32 endpoint with ESP admin password from environment variable
 app.post('/api/update', async (req, res) => {
     const { adminPass } = req.body;
-    
+
     try {
         console.log('ESP update request received');
-        
-        // Get ESP admin password column from environment variable
-        const espAdminCol = Number(process.env.ESP_ADMIN_COL) || 7; // Default to column H (index 7)
-        console.log('Fetching ESP admin password from column', espAdminCol, '(env: ESP_ADMIN_COL)');
-        
+
+        // 1️⃣ Get ESP admin password from column H (default index 7)
+        const espAdminCol = Number(process.env.ESP_ADMIN_COL) || 7;
         const espAdminPasswords = await getAllValFromColumn(espAdminCol);
-        console.log('ESP admin passwords retrieved:', espAdminPasswords[1], 'entries');
-        
-        // Get the hardcoded ESP password from the sheet (skip header row, use first data row)
         const validEspPassword = espAdminPasswords.length > 1 ? espAdminPasswords[1] : espAdminPasswords[0];
-        console.log('Valid ESP password from sheets:', validEspPassword ? 'SET' : 'NOT SET');
-        
-        // Verify ESP's admin password
+
         if (!validEspPassword || !adminPass || adminPass !== validEspPassword) {
             console.log('ESP admin password verification failed');
-            console.log('Provided:', adminPass ? 'SET' : 'NOT SET');
-            console.log('Expected:', validEspPassword ? 'SET' : 'NOT SET');
             return res.status(401).send('Invalid ESP admin password');
         }
 
-        console.log('ESP admin password verified successfully');
-        
-        // If password is valid, fetch member passwords from column D
-        const memberPasswordCol = Number(process.env.MEMBER_PASSWORD_COL) || 3; // Default to column D (index 3)
-        const currentPasswords = await getAllValFromColumn(memberPasswordCol);
-        console.log('Member passwords retrieved:', currentPasswords.length, 'entries');
-        
-        // Filter out empty passwords and join with commas
-        const validPasswords = currentPasswords.filter(pwd => pwd && pwd.length > 0);
-        const response = validPasswords.join(',');
-        
-        console.log('Sending', validPasswords.length, 'valid passwords to ESP32');
+        console.log('✅ ESP admin password verified successfully');
+
+        // 2️⃣ Fetch permanent member passwords (Column D)
+        const memberPasswordCol = Number(process.env.MEMBER_PASSWORD_COL) || 3; // D = index 3
+        const memberPasswords = await getAllValFromColumn(memberPasswordCol);
+        // Skip header + remove empty cells
+        const validMemberPasswords = memberPasswords.slice(1).filter(pwd => pwd && pwd.trim().length > 0);
+
+        // 3️⃣ Fetch temporary door OTPs (Column F)
+        const otpCol = Number(process.env.DOOR_OTP_COL) || 5; // F = index 5
+        const otpValues = await getAllValFromColumn(otpCol);
+        // Skip header + remove empty cells
+        const validOtps = otpValues.slice(1).filter(pwd => pwd && pwd.trim().length > 0);
+
+        // 4️⃣ Combine both sets
+        const combinedPasswords = [...validMemberPasswords, ...validOtps];
+        const response = combinedPasswords.join(',');
+
+        console.log(`Sending ${validMemberPasswords.length} member passwords + ${validOtps.length} OTPs to ESP32`);
         res.status(200).send(response);
-        
+
     } catch (error) {
         console.error('Error in /api/update endpoint:', error);
         res.status(500).send('Server error while processing request.');
